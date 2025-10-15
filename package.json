@@ -1,0 +1,29 @@
+{
+  "name": "skald-mcp",
+  "version": "0.1.0",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "description": "",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.5.0",
+    "@skald-labs/skald-node": "^0.1.1",
+    "axios": "^1.12.2",
+    "mcp-handler": "^1.0.2",
+    "minimist": "^1.2.8",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "@types/minimist": "^1.2.5",
+    "@types/node": "^22.13.5",
+    "typescript": "^5.7.3"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "lint:fix": "biome check . --write",
+    "lint": "biome check ."
+  }
+}
