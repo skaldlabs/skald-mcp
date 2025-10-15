@@ -30,7 +30,7 @@ Create new memos that are automatically processed, summarized, tagged, chunked, 
 1. Clone this repository:
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/skaldlabs/skald-mcp
 cd skald-mcp
 ```
 
