@@ -8,7 +8,7 @@
   "description": "",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.5.0",
-    "@skald-labs/skald-node": "^0.1.1",
+    "@skald-labs/skald-node": "file:../skald-node",
     "axios": "^1.12.2",
     "mcp-handler": "^1.0.2",
     "minimist": "^1.2.8",
