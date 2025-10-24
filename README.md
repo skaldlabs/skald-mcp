@@ -4,19 +4,31 @@ Chat with your Skald knowledge base, add and update new knowledge, and search th
 
 ## Features
 
-The Skald MCP server provides three powerful tools:
+The Skald MCP server provides seven powerful tools:
 
-### 1. **skald-chat** 
-Ask Skald questions about your knowledge base in natural language.
+### 1. **skald-chat**
+Ask Skald questions about your knowledge base in natural language with optional filters to narrow search context.
 
 ### 2. **skald-search**
-Search through your memos using multiple methods:
+Search through your memos using multiple methods with optional filters:
 - **Semantic search** (`chunk_vector_search`) - Find relevant content by meaning
 - **Title contains** (`title_contains`) - Case-insensitive substring matching
 - **Title starts with** (`title_startswith`) - Case-insensitive prefix matching
 
 ### 3. **skald-create-memo**
 Create new memos that are automatically processed, summarized, tagged, chunked, and indexed for search.
+
+### 4. **skald-get-memo**
+Retrieve a memo by UUID or client reference ID with full content, summary, tags, and chunks.
+
+### 5. **skald-update-memo**
+Update an existing memo by UUID or client reference ID. If content is updated, the memo will be reprocessed.
+
+### 6. **skald-delete-memo**
+Permanently delete a memo by UUID or client reference ID along with all associated data.
+
+### 7. **skald-generate**
+Generate documents based on prompts and retrieved context from the knowledge base with optional style/format rules and filters.
 
 ## Setup
 
@@ -152,6 +164,7 @@ The assistant will create a new memo in your Skald knowledge base, which will be
 |-----------|------|----------|-------------|
 | `query` | string | Yes | The question to ask your knowledge base |
 | `project_id` | string | No | Project UUID (required when using Token Authentication) |
+| `filters` | Filter[] | No | Optional filters to narrow the search context |
 
 ### skald-search
 
@@ -160,7 +173,7 @@ The assistant will create a new memo in your Skald knowledge base, which will be
 | `query` | string | Yes | The search query |
 | `search_method` | enum | Yes | One of: `chunk_vector_search`, `title_contains`, `title_startswith` |
 | `limit` | number | No | Maximum results to return (1-50, default 10) |
-| `tags` | string[] | No | Filter results by tags |
+| `filters` | Filter[] | No | Optional filters to narrow results |
 
 ### skald-create-memo
 
@@ -173,6 +186,62 @@ The assistant will create a new memo in your Skald knowledge base, which will be
 | `reference_id` | string | No | External reference ID to match with your documents |
 | `tags` | string[] | No | Tags for categorization |
 | `source` | string | No | Source of the content (useful for integrations) |
+
+### skald-get-memo
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `memo_id` | string | Yes | The memo UUID or client reference ID |
+| `id_type` | enum | No | Type of identifier: `memo_uuid` (default) or `reference_id` |
+
+### skald-update-memo
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `memo_id` | string | Yes | The memo UUID or client reference ID |
+| `id_type` | enum | No | Type of identifier: `memo_uuid` (default) or `reference_id` |
+| `title` | string | No | New title for the memo |
+| `content` | string | No | New content for the memo |
+| `metadata` | object | No | New metadata |
+| `client_reference_id` | string | No | New client reference ID |
+| `source` | string | No | New source |
+| `expiration_date` | string | No | New expiration date |
+
+### skald-delete-memo
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `memo_id` | string | Yes | The memo UUID or client reference ID |
+| `id_type` | enum | No | Type of identifier: `memo_uuid` (default) or `reference_id` |
+
+### skald-generate
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `prompt` | string | Yes | The prompt for document generation |
+| `rules` | string | No | Optional style/format rules |
+| `filters` | Filter[] | No | Optional filters to control which memos are used as context |
+
+### Filter Object
+
+Filters are used in `skald-chat`, `skald-search`, and `skald-generate` to narrow results:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `field` | string | Yes | The field to filter on |
+| `operator` | enum | Yes | One of: `eq`, `neq`, `contains`, `startswith`, `endswith`, `in`, `not_in` |
+| `value` | string or string[] | Yes | The value to filter by |
+| `filter_type` | enum | Yes | `native_field` (e.g., source, tags) or `custom_metadata` |
+
+**Example filter:**
+```json
+{
+  "field": "source",
+  "operator": "eq",
+  "value": "notion",
+  "filter_type": "native_field"
+}
+```
 
 ## Development
 
