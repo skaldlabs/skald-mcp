@@ -24,6 +24,34 @@ const server = new McpServer({
   version: '0.1.0',
 });
 
+// Reusable filter schema for tools that support filtering
+const filterSchema = z
+  .array(
+    z.object({
+      field: z.string().describe('The field to filter on'),
+      operator: z
+        .enum([
+          'eq',
+          'neq',
+          'contains',
+          'startswith',
+          'endswith',
+          'in',
+          'not_in',
+        ])
+        .describe('The filter operator'),
+      value: z
+        .union([z.string(), z.array(z.string())])
+        .describe('The value to filter by'),
+      filter_type: z
+        .enum(['native_field', 'custom_metadata'])
+        .describe(
+          'Filter type: native_field (e.g., source, tags) or custom_metadata',
+        ),
+    }),
+  )
+  .optional();
+
 // Tool 1: Chat - Ask questions to your knowledge base
 server.tool(
   'skald-chat',
@@ -34,33 +62,9 @@ server.tool(
       .string()
       .optional()
       .describe('Project UUID (required when using Token Authentication)'),
-    filters: z
-      .array(
-        z.object({
-          field: z.string().describe('The field to filter on'),
-          operator: z
-            .enum([
-              'eq',
-              'neq',
-              'contains',
-              'startswith',
-              'endswith',
-              'in',
-              'not_in',
-            ])
-            .describe('The filter operator'),
-          value: z
-            .union([z.string(), z.array(z.string())])
-            .describe('The value to filter by'),
-          filter_type: z
-            .enum(['native_field', 'custom_metadata'])
-            .describe(
-              'Filter type: native_field (e.g., source, tags) or custom_metadata',
-            ),
-        }),
-      )
-      .optional()
-      .describe('Optional filters to narrow the search context'),
+    filters: filterSchema.describe(
+      'Optional filters to narrow the search context',
+    ),
   },
   async (args) => {
     console.error('Debug - Asking Skald chat:', args.query);
@@ -112,33 +116,7 @@ server.tool(
       .optional()
       .default(10)
       .describe('Maximum number of results to return (1-50, default 10)'),
-    filters: z
-      .array(
-        z.object({
-          field: z.string().describe('The field to filter on'),
-          operator: z
-            .enum([
-              'eq',
-              'neq',
-              'contains',
-              'startswith',
-              'endswith',
-              'in',
-              'not_in',
-            ])
-            .describe('The filter operator'),
-          value: z
-            .union([z.string(), z.array(z.string())])
-            .describe('The value to filter by'),
-          filter_type: z
-            .enum(['native_field', 'custom_metadata'])
-            .describe(
-              'Filter type: native_field (e.g., source, tags) or custom_metadata',
-            ),
-        }),
-      )
-      .optional()
-      .describe('Optional filters to narrow results'),
+    filters: filterSchema.describe('Optional filters to narrow results'),
   },
   async (args) => {
     console.error('Debug - Searching Skald memos:', args.query);
@@ -434,33 +412,9 @@ server.tool(
       .describe(
         'Optional style/format rules (e.g., "Use formal business language. Include sections for: Overview, Requirements")',
       ),
-    filters: z
-      .array(
-        z.object({
-          field: z.string().describe('The field to filter on'),
-          operator: z
-            .enum([
-              'eq',
-              'neq',
-              'contains',
-              'startswith',
-              'endswith',
-              'in',
-              'not_in',
-            ])
-            .describe('The filter operator'),
-          value: z
-            .union([z.string(), z.array(z.string())])
-            .describe('The value to filter by'),
-          filter_type: z
-            .enum(['native_field', 'custom_metadata'])
-            .describe(
-              'Filter type: native_field (e.g., source, tags) or custom_metadata',
-            ),
-        }),
-      )
-      .optional()
-      .describe('Optional filters to control which memos are used as context'),
+    filters: filterSchema.describe(
+      'Optional filters to control which memos are used as context',
+    ),
   },
   async (args) => {
     console.error('Debug - Generating document with Skald:', args.prompt);
