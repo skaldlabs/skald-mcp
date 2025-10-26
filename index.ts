@@ -24,16 +24,47 @@ const server = new McpServer({
   version: '0.1.0',
 });
 
+// Reusable filter schema for tools that support filtering
+const filterSchema = z
+  .array(
+    z.object({
+      field: z.string().describe('The field to filter on'),
+      operator: z
+        .enum([
+          'eq',
+          'neq',
+          'contains',
+          'startswith',
+          'endswith',
+          'in',
+          'not_in',
+        ])
+        .describe('The filter operator'),
+      value: z
+        .union([z.string(), z.array(z.string())])
+        .describe('The value to filter by'),
+      filter_type: z
+        .enum(['native_field', 'custom_metadata'])
+        .describe(
+          'Filter type: native_field (e.g., source, tags) or custom_metadata',
+        ),
+    }),
+  )
+  .optional();
+
 // Tool 1: Chat - Ask questions to your knowledge base
 server.tool(
   'skald-chat',
-  'Ask a question to your Skald knowledge base and get an AI-generated response with inline citations',
+  'Ask a question to your Skald knowledge base and get an AI-generated response with inline citations. Supports optional filters to narrow search context',
   {
     query: z.string().describe('The question to ask your knowledge base'),
     project_id: z
       .string()
       .optional()
       .describe('Project UUID (required when using Token Authentication)'),
+    filters: filterSchema.describe(
+      'Optional filters to narrow the search context',
+    ),
   },
   async (args) => {
     console.error('Debug - Asking Skald chat:', args.query);
@@ -42,6 +73,9 @@ server.tool(
       const chatParams: any = { query: args.query };
       if (args.project_id) {
         chatParams.project_id = args.project_id;
+      }
+      if (args.filters) {
+        chatParams.filters = args.filters;
       }
 
       const response = await skald.chat(chatParams);
@@ -67,7 +101,7 @@ server.tool(
 // Tool 2: Search - Search through memos
 server.tool(
   'skald-search',
-  'Search through your Skald memos using various search methods (semantic search, title contains, title starts with)',
+  'Search through your Skald memos using various search methods (semantic search, title contains, title starts with) with optional filters',
   {
     query: z.string().describe('The search query'),
     search_method: z
@@ -82,7 +116,7 @@ server.tool(
       .optional()
       .default(10)
       .describe('Maximum number of results to return (1-50, default 10)'),
-    tags: z.array(z.string()).optional().describe('Filter results by tags'),
+    filters: filterSchema.describe('Optional filters to narrow results'),
   },
   async (args) => {
     console.error('Debug - Searching Skald memos:', args.query);
@@ -96,8 +130,8 @@ server.tool(
           | 'title_startswith',
         limit: args.limit,
       };
-      if (args.tags) {
-        searchParams.tags = args.tags;
+      if (args.filters) {
+        searchParams.filters = args.filters;
       }
 
       const response = await skald.search(searchParams);
@@ -202,6 +236,213 @@ server.tool(
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to create Skald memo: ${errorMessage}`);
+    }
+  },
+);
+
+// Tool 4: Get Memo - Retrieve a memo by UUID or reference ID
+server.tool(
+  'skald-get-memo',
+  'Retrieve a memo by UUID or client reference ID with full content, summary, tags, and chunks',
+  {
+    memo_id: z.string().describe('The memo UUID or client reference ID'),
+    id_type: z
+      .enum(['memo_uuid', 'reference_id'])
+      .optional()
+      .default('memo_uuid')
+      .describe(
+        'Type of identifier: memo_uuid (default) or reference_id',
+      ),
+  },
+  async (args) => {
+    console.error('Debug - Getting Skald memo:', args.memo_id);
+
+    try {
+      const memo = await skald.getMemo(args.memo_id, args.id_type);
+
+      const tagsText = memo.tags.map((t) => t.tag).join(', ');
+      const chunksText = memo.chunks
+        .map((c) => `Chunk ${c.chunk_index}: ${c.chunk_content.substring(0, 100)}...`)
+        .join('\n');
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: [
+              `Memo: ${memo.title}`,
+              `UUID: ${memo.uuid}`,
+              `Created: ${memo.created_at}`,
+              `Updated: ${memo.updated_at}`,
+              `Summary: ${memo.summary}`,
+              `Content: ${memo.content}`,
+              `Tags: ${tagsText || 'None'}`,
+              `Client Reference ID: ${memo.client_reference_id || 'None'}`,
+              `Source: ${memo.source || 'None'}`,
+              `Type: ${memo.type}`,
+              `Chunks: ${memo.chunks.length}`,
+              chunksText ? `\n${chunksText}` : '',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+          },
+        ],
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to get Skald memo: ${errorMessage}`);
+    }
+  },
+);
+
+// Tool 5: Update Memo - Update an existing memo
+server.tool(
+  'skald-update-memo',
+  'Update an existing memo by UUID or client reference ID. If content is updated, the memo will be reprocessed',
+  {
+    memo_id: z.string().describe('The memo UUID or client reference ID'),
+    id_type: z
+      .enum(['memo_uuid', 'reference_id'])
+      .optional()
+      .default('memo_uuid')
+      .describe(
+        'Type of identifier: memo_uuid (default) or reference_id',
+      ),
+    title: z
+      .string()
+      .max(255)
+      .optional()
+      .describe('New title for the memo'),
+    content: z.string().optional().describe('New content for the memo'),
+    metadata: z.record(z.any()).optional().describe('New metadata'),
+    client_reference_id: z
+      .string()
+      .max(255)
+      .optional()
+      .describe('New client reference ID'),
+    source: z.string().max(255).optional().describe('New source'),
+    expiration_date: z.string().optional().describe('New expiration date'),
+  },
+  async (args) => {
+    console.error('Debug - Updating Skald memo:', args.memo_id);
+
+    try {
+      const updateData: any = {};
+
+      // Only add fields that were provided
+      if (args.title !== undefined) updateData.title = args.title;
+      if (args.content !== undefined) updateData.content = args.content;
+      if (args.metadata !== undefined) updateData.metadata = args.metadata;
+      if (args.client_reference_id !== undefined)
+        updateData.client_reference_id = args.client_reference_id;
+      if (args.source !== undefined) updateData.source = args.source;
+      if (args.expiration_date !== undefined)
+        updateData.expiration_date = args.expiration_date;
+
+      const response = await skald.updateMemo(
+        args.memo_id,
+        updateData,
+        args.id_type,
+      );
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: response.ok
+              ? `✓ Memo "${args.memo_id}" updated successfully!`
+              : 'Failed to update memo',
+          },
+        ],
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to update Skald memo: ${errorMessage}`);
+    }
+  },
+);
+
+// Tool 6: Delete Memo - Delete a memo
+server.tool(
+  'skald-delete-memo',
+  'Permanently delete a memo by UUID or client reference ID. This deletes the memo and all associated data (content, summary, tags, chunks)',
+  {
+    memo_id: z.string().describe('The memo UUID or client reference ID'),
+    id_type: z
+      .enum(['memo_uuid', 'reference_id'])
+      .optional()
+      .default('memo_uuid')
+      .describe(
+        'Type of identifier: memo_uuid (default) or reference_id',
+      ),
+  },
+  async (args) => {
+    console.error('Debug - Deleting Skald memo:', args.memo_id);
+
+    try {
+      await skald.deleteMemo(args.memo_id, args.id_type);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `✓ Memo "${args.memo_id}" deleted successfully!`,
+          },
+        ],
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to delete Skald memo: ${errorMessage}`);
+    }
+  },
+);
+
+// Tool 7: Generate Document - Generate documents with AI based on prompts and knowledge base context
+server.tool(
+  'skald-generate',
+  'Generate documents based on prompts and retrieved context from the knowledge base with optional style/format rules and filters',
+  {
+    prompt: z.string().describe('The prompt for document generation'),
+    rules: z
+      .string()
+      .optional()
+      .describe(
+        'Optional style/format rules (e.g., "Use formal business language. Include sections for: Overview, Requirements")',
+      ),
+    filters: filterSchema.describe(
+      'Optional filters to control which memos are used as context',
+    ),
+  },
+  async (args) => {
+    console.error('Debug - Generating document with Skald:', args.prompt);
+
+    try {
+      const generateParams: any = {
+        prompt: args.prompt,
+      };
+
+      if (args.rules) generateParams.rules = args.rules;
+      if (args.filters) generateParams.filters = args.filters;
+
+      const response = await skald.generateDoc(generateParams);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: response.response || 'No response received',
+          },
+        ],
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Failed to generate document with Skald: ${errorMessage}`,
+      );
     }
   },
 );
