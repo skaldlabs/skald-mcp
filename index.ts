@@ -84,7 +84,7 @@ server.tool(
         content: [
           {
             type: 'text',
-            text: response.response || 'No response received',
+            text: response || 'No response received',
           },
         ],
       };
@@ -101,13 +101,13 @@ server.tool(
 // Tool 2: Search - Search through memos
 server.tool(
   'skald-search',
-  'Search through your Skald memos using various search methods (semantic search, title contains, title starts with) with optional filters',
+  'Search through your Skald memos using semantic search on memo chunks with optional filters',
   {
     query: z.string().describe('The search query'),
     search_method: z
-      .enum(['chunk_vector_search', 'title_contains', 'title_startswith'])
+      .enum(['chunk_semantic_search'])
       .describe(
-        'Search method: chunk_vector_search (semantic search), title_contains (substring match), or title_startswith (prefix match)',
+        'Search method: chunk_semantic_search (semantic search on memo chunks)',
       ),
     limit: z
       .number()
@@ -124,10 +124,7 @@ server.tool(
     try {
       const searchParams: any = {
         query: args.query,
-        search_method: args.search_method as
-          | 'chunk_vector_search'
-          | 'title_contains'
-          | 'title_startswith',
+        search_method: args.search_method as 'chunk_semantic_search',
         limit: args.limit,
       };
       if (args.filters) {
@@ -396,53 +393,6 @@ server.tool(
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to delete Skald memo: ${errorMessage}`);
-    }
-  },
-);
-
-// Tool 7: Generate Document - Generate documents with AI based on prompts and knowledge base context
-server.tool(
-  'skald-generate',
-  'Generate documents based on prompts and retrieved context from the knowledge base with optional style/format rules and filters',
-  {
-    prompt: z.string().describe('The prompt for document generation'),
-    rules: z
-      .string()
-      .optional()
-      .describe(
-        'Optional style/format rules (e.g., "Use formal business language. Include sections for: Overview, Requirements")',
-      ),
-    filters: filterSchema.describe(
-      'Optional filters to control which memos are used as context',
-    ),
-  },
-  async (args) => {
-    console.error('Debug - Generating document with Skald:', args.prompt);
-
-    try {
-      const generateParams: any = {
-        prompt: args.prompt,
-      };
-
-      if (args.rules) generateParams.rules = args.rules;
-      if (args.filters) generateParams.filters = args.filters;
-
-      const response = await skald.generateDoc(generateParams);
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: response.response || 'No response received',
-          },
-        ],
-      };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      throw new Error(
-        `Failed to generate document with Skald: ${errorMessage}`,
-      );
     }
   },
 );
