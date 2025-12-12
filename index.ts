@@ -226,8 +226,8 @@ server.tool(
         content: [
           {
             type: 'text',
-            text: response.ok
-              ? `✓ Memo "${args.title}" created successfully!`
+            text: response.memo_uuid
+              ? `✓ Memo "${args.title}" created successfully! UUID: ${response.memo_uuid}`
               : 'Failed to create memo',
           },
         ],
@@ -258,7 +258,7 @@ server.tool(
     console.error('Debug - Getting Skald memo:', args.memo_id);
 
     try {
-      const memo = await skald.getMemo(args.memo_id, args.id_type);
+      const memo = await skald.getMemo({memoId: args.memo_id, idType: args.id_type});
 
       const tagsText = memo.tags.map((t) => t.tag).join(', ');
       const chunksText = memo.chunks
@@ -341,9 +341,7 @@ server.tool(
         updateData.expiration_date = args.expiration_date;
 
       const response = await skald.updateMemo(
-        args.memo_id,
-        updateData,
-        args.id_type,
+       {memoId: args.memo_id, idType: args.id_type, ...updateData}
       );
 
       return {
@@ -382,7 +380,7 @@ server.tool(
     console.error('Debug - Deleting Skald memo:', args.memo_id);
 
     try {
-      await skald.deleteMemo(args.memo_id, args.id_type);
+      await skald.deleteMemo({memoId: args.memo_id, idType: args.id_type});
 
       return {
         content: [
@@ -396,53 +394,6 @@ server.tool(
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to delete Skald memo: ${errorMessage}`);
-    }
-  },
-);
-
-// Tool 7: Generate Document - Generate documents with AI based on prompts and knowledge base context
-server.tool(
-  'skald-generate',
-  'Generate documents based on prompts and retrieved context from the knowledge base with optional style/format rules and filters',
-  {
-    prompt: z.string().describe('The prompt for document generation'),
-    rules: z
-      .string()
-      .optional()
-      .describe(
-        'Optional style/format rules (e.g., "Use formal business language. Include sections for: Overview, Requirements")',
-      ),
-    filters: filterSchema.describe(
-      'Optional filters to control which memos are used as context',
-    ),
-  },
-  async (args) => {
-    console.error('Debug - Generating document with Skald:', args.prompt);
-
-    try {
-      const generateParams: any = {
-        prompt: args.prompt,
-      };
-
-      if (args.rules) generateParams.rules = args.rules;
-      if (args.filters) generateParams.filters = args.filters;
-
-      const response = await skald.generateDoc(generateParams);
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: response.response || 'No response received',
-          },
-        ],
-      };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      throw new Error(
-        `Failed to generate document with Skald: ${errorMessage}`,
-      );
     }
   },
 );
