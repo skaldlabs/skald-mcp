@@ -84,7 +84,7 @@ server.tool(
         content: [
           {
             type: 'text',
-            text: response.response || 'No response received',
+            text: response || 'No response received',
           },
         ],
       };
@@ -101,13 +101,13 @@ server.tool(
 // Tool 2: Search - Search through memos
 server.tool(
   'skald-search',
-  'Search through your Skald memos using various search methods (semantic search, title contains, title starts with) with optional filters',
+  'Search through your Skald memos using semantic search on memo chunks with optional filters',
   {
     query: z.string().describe('The search query'),
     search_method: z
-      .enum(['chunk_vector_search', 'title_contains', 'title_startswith'])
+      .enum(['chunk_semantic_search'])
       .describe(
-        'Search method: chunk_vector_search (semantic search), title_contains (substring match), or title_startswith (prefix match)',
+        'Search method: chunk_semantic_search (semantic search on memo chunks)',
       ),
     limit: z
       .number()
@@ -124,10 +124,7 @@ server.tool(
     try {
       const searchParams: any = {
         query: args.query,
-        search_method: args.search_method as
-          | 'chunk_vector_search'
-          | 'title_contains'
-          | 'title_startswith',
+        search_method: args.search_method as 'chunk_semantic_search',
         limit: args.limit,
       };
       if (args.filters) {
